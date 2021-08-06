@@ -1,0 +1,1 @@
+select * from dbs601..vs6servidor where instancia = 'scbt121cto' or instanciafisica = 'scbt121cto'

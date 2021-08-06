@@ -1,0 +1,14 @@
+Set noCount On 
+Create Table #HostNane (HostName VarChar(30)null , Instancia VarChar(30) null, StartUp dateTime null)
+
+If SERVERPROPERTY('IsClustered') = 0
+	Insert #HostNane (HostName) exec master..xp_cmdshell 'hostname'
+
+If SERVERPROPERTY('IsClustered') = 1
+	Insert #HostNane (HostName) SELECT Top 1 * FROM ::fn_virtualservernodes()
+
+Update #HostNane Set Instancia = @@Servername where HostName is not null
+Update #HostNane Set StartUp = login_time from master..sysprocesses where spid = 1 
+select * from #HostNane where HostName is not null
+
+Drop table #HostNane

@@ -1,0 +1,18 @@
+select top 10 * from sys.dm_exec_query_stats
+order by total_worker_time desc
+
+select query_hash,COUNT(*) from sys.dm_exec_requests where session_id > 50
+group by query_hash
+order by COUNT(*) desc
+
+select * from sys.dm_exec_requests where 
+query_hash = 0x976A468FD368AF19
+
+select * from sys.dm_os_schedulers
+
+select * from sys.dm_os_tasks
+select * from sys.dm_os_waiting_tasks where session_id is not null
+
+select * from sys.dm_exec_query_memory_grants
+
+select * from sys.dm_exec_sql_text(0x03000600960FC71D64DB3601379E00000100000000000000)

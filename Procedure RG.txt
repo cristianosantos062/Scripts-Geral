@@ -1,0 +1,335 @@
+ USE MASTER
+GO
+ 
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[PR_RG_CONFIGURE]') AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[PR_RG_CONFIGURE]
+GO
+ 
+CREATE PROCEDURE dbo.PR_RG_CONFIGURE
+    @TYPE NVARCHAR(256)=NULL
+,   @DATABASE SYSNAME=NULL
+,   @WORKLOAD SYSNAME=NULL
+AS
+BEGIN
+    SET XACT_ABORT ON
+    IF @@TRANCOUNT>0
+    BEGIN
+         RAISERROR('Erro: Esta procedure nao pode ser utilizada dentro de um BEGIN TRANSACTION.', 16, 1)
+         GOTO END_SAVE
+    END
+    
+    IF @TYPE='CONFIG_SERVER'
+    BEGIN
+         GOTO CLEANUP_SERVER
+    END
+         ELSE IF @TYPE='ADD_DATABASE'
+         BEGIN
+             GOTO ADD_DATABASE
+         END
+ 
+         ELSE IF @TYPE='STOP_SERVER'
+         BEGIN
+             GOTO STOP_SERVER
+         END
+ 
+         ELSE IF @TYPE='REMOVE_DATABASE'
+         BEGIN
+             GOTO REMOVE_DATABASE
+         END
+ 
+         ELSE IF @TYPE='CONSULTA_PARM'
+         BEGIN
+             GOTO CONSULTA_PARM
+         END
+ 
+         ELSE IF @TYPE='START_SERVER'
+         BEGIN
+             GOTO START_SERVER
+         END
+         
+         ELSE IF @TYPE='CLEANUP_SERVER'
+         BEGIN
+             GOTO CLEANUP_SERVER
+         END
+    ELSE GOTO HELP
+ 
+CLEANUP_SERVER:
+BEGIN
+    ALTER RESOURCE GOVERNOR WITH (CLASSIFIER_FUNCTION = NULL);
+    ALTER RESOURCE GOVERNOR RECONFIGURE;
+ 
+    DECLARE @Name NVARCHAR(512), @SQLSTMD NVARCHAR(MAX)
+    
+    IF EXISTS(SELECT name FROM sys.dm_resource_governor_workload_groups WHERE group_id >2)
+    BEGIN
+         DECLARE GROUPDELETE CURSOR FOR
+         SELECT name FROM sys.dm_resource_governor_workload_groups WHERE group_id >2
+         OPEN GROUPDELETE;
+         FETCH NEXT FROM GROUPDELETE INTO @Name
+         WHILE @@FETCH_STATUS = 0
+         BEGIN
+             SELECT @SQLSTMD = 'DROP WORKLOAD GROUP [' + RTRIM(@Name) + '];'
+             EXECUTE(@SQLSTMD)
+             FETCH NEXT FROM GROUPDELETE INTO @Name
+         END
+         CLOSE GROUPDELETE;
+         DEALLOCATE GROUPDELETE;
+    END
+    
+    IF EXISTS(SELECT name FROM sys.dm_resource_governor_resource_pools WHERE pool_id >2)
+    BEGIN
+    SET @Name=NULL 
+    DECLARE POOLDELETE CURSOR FOR
+         SELECT name FROM sys.dm_resource_governor_resource_pools WHERE pool_id >2
+         OPEN POOLDELETE;
+         FETCH NEXT FROM POOLDELETE INTO @Name
+         WHILE @@FETCH_STATUS = 0
+         BEGIN
+             SELECT @SQLSTMD = 'DROP RESOURCE POOL [' + RTRIM(@Name) + '];'
+             EXECUTE(@SQLSTMD)
+             FETCH NEXT FROM POOLDELETE INTO @Name
+         END
+         CLOSE POOLDELETE;
+         DEALLOCATE POOLDELETE;
+    END
+    
+    IF EXISTS(SELECT * FROM master.sys.sysobjects WHERE name='fn_classificacao' AND TYPE='FN')
+    BEGIN
+            --DECLARE @CMD VARCHAR(8000)
+            --SELECT @CMD='USE MASTER; DROP FUNCTION dbo.fn_classificacao;'
+            --EXECUTE @CMD
+            DROP FUNCTION dbo.fn_classificacao;
+    END
+    IF EXISTS (SELECT * FROM master.sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[TB_RG_CONFIG]') AND type in (N'U'))
+         DROP TABLE [master].[dbo].[TB_RG_CONFIG]
+         
+    ALTER RESOURCE GOVERNOR DISABLE;
+      ALTER RESOURCE GOVERNOR RECONFIGURE;
+
+    IF @TYPE='CONFIG_SERVER'     
+            GOTO CONFIG_SERVER
+    ELSE
+            GOTO END_SAVE
+END
+ 
+CONFIG_SERVER:
+BEGIN
+    DECLARE @FN_VALIDATION INT=0
+    SELECT @FN_VALIDATION=COUNT(*) FROM sys.sysobjects WHERE name='fn_classificacao'
+    IF @FN_VALIDATION=0
+         GOTO CREATE_FUNCTION
+ 
+    CREATE RESOURCE POOL RP_POOL_REGULAR
+    WITH
+    (   MIN_CPU_PERCENT = 0
+    ,   MAX_CPU_PERCENT = 80
+    );
+    CREATE RESOURCE POOL RP_POOL_LOW
+    WITH
+    (   MIN_CPU_PERCENT = 0
+    ,   MAX_CPU_PERCENT = 20
+    );
+    CREATE WORKLOAD GROUP WL_APP_DB
+    WITH
+    (   IMPORTANCE = HIGH
+    ,   REQUEST_MAX_MEMORY_GRANT_PERCENT = 25
+    ,   REQUEST_MAX_CPU_TIME_SEC = 0
+    ,   REQUEST_MEMORY_GRANT_TIMEOUT_SEC = 0
+    ,   MAX_DOP = 0
+    ,   GROUP_MAX_REQUESTS = 0
+    )
+    USING RP_POOL_REGULAR;
+    CREATE WORKLOAD GROUP WL_APP_LOW
+    WITH
+    (   IMPORTANCE = HIGH
+    ,   REQUEST_MAX_MEMORY_GRANT_PERCENT = 25
+    ,   REQUEST_MAX_CPU_TIME_SEC = 0
+    ,   REQUEST_MEMORY_GRANT_TIMEOUT_SEC = 0
+    ,   MAX_DOP = 0
+    ,   GROUP_MAX_REQUESTS = 0
+    )
+    USING RP_POOL_LOW;
+    ALTER RESOURCE GOVERNOR RECONFIGURE;
+    ALTER RESOURCE GOVERNOR WITH (CLASSIFIER_FUNCTION=dbo.fn_classificacao);
+    ALTER RESOURCE GOVERNOR RECONFIGURE;
+    PRINT 'Info: Processo Finalizado.'
+    GOTO END_SAVE
+END
+ 
+ADD_DATABASE:
+BEGIN
+    IF @DATABASE IS NOT NULL AND @WORKLOAD IS NOT NULL
+         BEGIN
+             DECLARE @COUNT INT=0, @WRK_COUNT INT=0
+             IF EXISTS(SELECT * FROM master.sys.objects WHERE name LIKE 'TB_RG_CONFIG' AND type='U')
+                 SELECT @COUNT=COUNT(*) FROM master.dbo.TB_RG_CONFIG WHERE DatabaseName LIKE @DATABASE
+             ELSE
+                 GOTO TABLE_CREATION
+ 
+             IF @COUNT>0
+             BEGIN
+                 SELECT @WRK_COUNT=COUNT(*) FROM SYS.dm_resource_governor_workload_groups WHERE name=@WORKLOAD
+                 IF @WRK_COUNT>0
+                 BEGIN
+                     UPDATE master.dbo.TB_RG_CONFIG SET WorkloadName=@WORKLOAD FROM master.dbo.TB_RG_CONFIG WHERE DatabaseName = @DATABASE;
+                     IF @@ERROR=0
+                          PRINT 'Info: Workload Atualizado.'
+                     ELSE
+                          PRINT 'Error: Falha na atualizacao.'
+                 END
+                 ELSE
+                     PRINT 'Falha: O Workload utilizado nao existe. Consulte a lista de Workload em sys.dm_resource_governor_workload_groups.'
+                 
+             END
+             ELSE
+             BEGIN
+                 SELECT @WRK_COUNT=COUNT(*) FROM SYS.dm_resource_governor_workload_groups WHERE name=@WORKLOAD
+                 IF @WRK_COUNT>0
+                 BEGIN
+                     INSERT INTO master.dbo.TB_RG_CONFIG VALUES(@DATABASE, @WORKLOAD);
+                     IF @@ERROR=0
+                          PRINT 'Info: Banco de dados e Workload inseridos.'
+                     ELSE
+                          PRINT 'Erro: Falha no insert'
+                 END
+                 ELSE
+                     PRINT 'Falha: O Workload utilizado nao existe. Consulte a lista de Workload em sys.dm_resource_governor_workload_groups.'
+ 
+             END 
+         END
+    ELSE
+         PRINT 'Erro: Falha no INSERT, Por favor adicione o nome do banco de dados e workload nos parametros da procedure.'
+    
+    GOTO END_SAVE
+END
+ 
+STOP_SERVER:
+BEGIN
+    ALTER RESOURCE GOVERNOR DISABLE;
+    GOTO END_SAVE
+END
+ 
+HELP:
+BEGIN
+    PRINT 'Para executar esta procedure escolha o parametro correto: CONFIG_SERVER, ADD_DATABASE, REMOVE_DATABASE, CONSULTA_PARM, STOP_SERVER OU START_SERVER'
+    PRINT '1) CONFIG_SERVER: Habilita e adiciona os Grupos de HW e Workloads padroes.'
+    PRINT '2) ADD_DATABASE: Adiciona ou atualiza uma database e associa a um Workload.'
+    PRINT '3) REMOVE_DATABASE: Remove uma database da tabela de configuracao.'
+    PRINT '4) CONSULTA_PARM: Aciona a parada do servico do Resource Governor no ambiente.'
+    PRINT '5) STOP_SERVER: Aciona a parada do servico do Resource Governor no ambiente.'
+    PRINT '6) START_SERVER: Aciona o servico do Resource Governor no ambiente.'
+    PRINT '7) CLEANUP_SERVER: Faz a limpeza e remove todos os recursos e o servico do Resource Governor no ambiente.'
+    PRINT ' '
+    PRINT 'EXECUTE PR_RG_CONFIGURE PARAMETRO1, PARAMETRO2 (Opcional), PARAMETRO3 (Opcional)'
+    PRINT ' '
+    PRINT 'Ex: EXECUTE PR_RG_CONFIGURE ''ADD_DATABASE'', ''DATABASE NAME'', ''WORKLOAD NAME'''
+    PRINT 'Os dois ultimos parametros sao necessarios apenas para a opcao ADD_DATABASE e REMOVE_DATABASE'
+    GOTO END_SAVE
+END
+ 
+TABLE_CREATION:
+BEGIN
+    CREATE TABLE TB_RG_CONFIG (DatabaseName SYSNAME NOT NULL PRIMARY KEY, WorkloadName SYSNAME NOT NULL);
+    IF NOT EXISTS(SELECT * FROM sys.sysobjects WHERE name='fn_classificacao' AND TYPE='FN')
+         GOTO CREATE_FUNCTION
+    ELSE
+         GOTO ADD_DATABASE
+END
+ 
+CREATE_FUNCTION:
+BEGIN
+ 
+    IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[TB_RG_CONFIG]') AND type in (N'U'))
+         GOTO TABLE_CREATION
+ 
+    DECLARE @SQLSTM VARCHAR(MAX)
+    SET @SQLSTM='CREATE FUNCTION dbo.fn_classificacao() RETURNS sysname 
+    WITH SCHEMABINDING
+    AS
+    BEGIN
+         DECLARE @grp_name AS sysname, @WorkloadName VARCHAR(256)=NULL, @DB_NAME SYSNAME
+IF ORIGINAL_DB_NAME() IS NOT NULL AND LTRIM(RTRIM(LEN(ORIGINAL_DB_NAME()))) > 0 
+    SET @DB_NAME=COALESCE(ORIGINAL_DB_NAME(), CAST(LOGINPROPERTY(SUSER_SNAME(), ''DefaultDatabase'') AS SYSNAME), ''master'')
+ELSE
+    SET @DB_NAME=COALESCE(CAST(LOGINPROPERTY(SUSER_SNAME(), ''DefaultDatabase'') AS SYSNAME), ''master'')
+    
+         IF @DB_NAME IS NOT NULL
+             SELECT @WorkloadName=WorkloadName FROM dbo.TB_RG_CONFIG WHERE DatabaseName LIKE @DB_NAME
+ 
+         IF (@WorkloadName IS NOT NULL)
+             SET @grp_name = @WorkloadName
+         ELSE
+             SET @grp_name = ''default''
+         RETURN @grp_name
+    END'
+    EXECUTE(@SQLSTM)
+    GOTO CONFIG_SERVER
+END
+ 
+REMOVE_DATABASE:
+BEGIN
+    IF @DATABASE IS NOT NULL AND EXISTS(SELECT * FROM master.dbo.TB_RG_CONFIG WHERE DatabaseName=@DATABASE)
+    BEGIN
+         DELETE FROM master.dbo.TB_RG_CONFIG WHERE DatabaseName=@DATABASE
+         IF @@ERROR=0
+         PRINT 'Info: Banco de dados apagado com sucesso.'
+         ELSE
+         PRINT 'Erro: Banco de dados nao pode ser apagado.'
+    END 
+    ELSE IF @DATABASE IS NULL
+         GOTO HELP
+    ELSE IF NOT EXISTS(SELECT * FROM master.dbo.TB_RG_CONFIG WHERE DatabaseName=@DATABASE)
+         PRINT 'Erro: Banco de dados nao existe.'
+    ELSE
+         PRINT 'Erro: Falha geral na exclusao do banco de dados'
+         
+    GOTO END_SAVE
+END
+ 
+CONSULTA_PARM:
+BEGIN
+    PRINT 'Configuracao da tabela de Databases vs Workloads'
+    PRINT '------------------------------------------------'
+    DECLARE @DatabaseName_C SYSNAME, @WorkloadName_C SYSNAME
+    DECLARE TBCONFIG CURSOR FOR
+    SELECT DatabaseName, WorkloadName FROM master.DBO.TB_RG_CONFIG
+    OPEN TBCONFIG;
+    FETCH NEXT FROM TBCONFIG INTO @DatabaseName_C, @WorkloadName_C;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+         PRINT 'Database: ' + RTRIM(@DatabaseName_C) + ' -> ' + 'Workload: ' + RTRIM(@WorkloadName_C)
+         FETCH NEXT FROM TBCONFIG INTO @DatabaseName_C, @WorkloadName_C;
+    END
+    CLOSE TBCONFIG;
+    DEALLOCATE TBCONFIG;
+ 
+    PRINT ' '
+    PRINT ' '
+    PRINT 'Configuracao padrao do Resource Governor'
+    PRINT '------------------------------------------------'
+    PRINT 'Resource Governor'
+    PRINT '        |        '
+    PRINT '        + RP_POOL_REGULAR'
+    PRINT '        |        |'
+    PRINT '        |        + WL_APP_DB'
+    PRINT '        |        '
+    PRINT '        + RP_POOL_LOW'
+    PRINT '                 |'
+    PRINT '                 + WL_APP_LOW'
+    
+    GOTO END_SAVE
+END
+ 
+START_SERVER:
+BEGIN
+    ALTER RESOURCE GOVERNOR WITH (CLASSIFIER_FUNCTION=dbo.fn_classificacao);
+    ALTER RESOURCE GOVERNOR RECONFIGURE;
+    GOTO END_SAVE
+END
+ 
+END_SAVE:
+BEGIN
+    RETURN
+END
+END
+GO

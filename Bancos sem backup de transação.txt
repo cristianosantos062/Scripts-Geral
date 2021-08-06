@@ -1,0 +1,12 @@
+-- Exibe bancos sem device TRL que tem Recovery Model configurado como FULL 
+
+create table #Device (Banco varchar (30) null, IdBanco integer, recovery_model varchar (10) null)
+
+insert into #Device select name + '_TRL', database_id, recovery_model_desc from sys.databases WHERE recovery_model_desc = 'FULL'
+
+select db_name(IdBanco) from #Device WHERE Banco NOT IN (SELECT NAME FROM SYSDEVICES)
+
+drop table #Device
+
+
+select name from sys.databases WHERE recovery_model_desc = 'FULL' and name not in (select banco from dbs600..vs6rotinas where tipo = 'backtran')

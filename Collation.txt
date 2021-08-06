@@ -1,0 +1,11 @@
+select Cast(Object_name(id) as VarChar(25)) as Tabela, 
+
+          Cast(name as VarChar(25)) as Coluna, 
+
+          Cast (collation as VarChar(40)) As Collation 
+
+from syscolumns 
+
+where collation ='SQL_Latin1_General_CP1_CI_AS'
+
+Order by 1, colorder

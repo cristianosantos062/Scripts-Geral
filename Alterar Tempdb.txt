@@ -1,0 +1,14 @@
+USE master;
+
+GO
+
+ALTER DATABASE tempdb 
+
+MODIFY FILE (NAME = TEMPEXT_LOG, FILENAME = 'I:\Log\TEMPEXT_LOG.LDF');
+
+GO
+
+ALTER DATABASE tempdb 
+
+MODIFY FILE (NAME = templog, FILENAME = 'I:\Log\templog.ldf');
+

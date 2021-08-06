@@ -1,0 +1,53 @@
+SELECT
+            spid,
+            blocked,
+            db_name(dbid) 'dbname',
+            open_tran,
+            convert(char(20), status) 'cmd_status',
+            cmd,
+            loginame,
+            last_batch,
+            waittime
+FROM
+            sysprocesses
+WHERE
+            cmd not in('AWAITING COMMAND', 'TASK MANAGER')
+AND     dbid = db_id(‘DBNAME’)
+
+
+
+
+SELECT
+            spid,
+            blocked,
+            db_name(dbid) 'dbname',
+            open_tran,
+            convert(char(20), status) 'cmd_status',
+            cmd,
+            loginame,
+            last_batch,
+            waittim
+FROM
+            sysprocesses
+WHERE
+            cmd not in('AWAITING COMMAND', 'TASK MANAGER')
+AND     loginame <> 'sa'
+UNION
+SELECT
+            spid,
+            blocked,
+            db_name(dbid) 'dbname',
+            open_tran,
+            convert(char(20), status) 'cmd_status',
+            cmd,
+            loginame,
+            last_batch,
+            waittime
+FROM
+            sysprocesses
+WHERE
+            cmd = 'AWAITING COMMAND'
+AND     blocked <> 0
+order by
+            spid
+

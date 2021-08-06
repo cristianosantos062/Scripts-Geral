@@ -1,0 +1,18 @@
+use dbs601
+go
+
+select distinct
+  vS6BancoServ.servidor,
+  vS6BancoServ.banco,
+  racf, responsavel
+  from vS6RespBanco
+    join vS6BancoServ
+    on vS6RespBanco.banco = vS6BancoServ.banco
+  
+  where vS6BancoServ.servidor = 'scbt013cto'
+  and vS6BancoServ.banco not like '%s6%'
+  and vS6BancoServ.banco <> 'master'
+  and vS6BancoServ.banco <> 'msdb'
+
+  
+  order by racf asc

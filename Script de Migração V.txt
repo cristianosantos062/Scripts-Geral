@@ -1,0 +1,142 @@
+
+/* **********************************************************/
+/* Acertos após migração 2005 - 2008			*/
+/* *********************************************************/
+
+declare @str nvarchar(500)
+declare @tab sysname
+declare @owner sysname
+declare @banco nvarchar(50) 
+declare @sch sysname
+declare @lgn sysname
+Declare @name sysname 
+
+-- Captura o nome do banco de dados atual....
+set @banco = db_name()
+
+Print 'BANCO: ' + db_name()
+print ''
+print '1. Alterando Compatibilidade' 
+	Checkpoint
+--Backup log @banco 
+
+EXEC dbo.sp_dbcmptlevel @dbname = @banco, @new_cmptlevel = 100
+
+print ''
+print '2. Altera o dono da base para sa'
+	EXEC dbo.sp_changedbowner @loginame = N'sa', @map = false
+
+print ''
+print '3. Desabilitando Broker'
+	set @str = 'ALTER DATABASE ['+@banco+'] SET DISABLE_BROKER With Rollback Immediate'
+		print 'Alterando o banco: ' + @banco
+		exec sp_executesql @str
+
+print ''
+print '4. Desabilitando Fulltext Search'
+	set @str = @banco + '..sp_fulltext_database disable'
+		print 'Alterando o banco: ' + @banco
+		exec sp_executesql @str
+
+print ''
+print '5. Alterando o PAGE_VERIFY para CHECKSUM'
+	Set @str = 'ALTER DATABASE '+ @banco +' SET PAGE_VERIFY CHECKSUM  WITH NO_WAIT'
+	exec sp_executesql @str
+
+print ''
+/*print '6. Alterando os Schemas para dbo: ' + db_name()
+	select @sch = min( name )	from sys.database_principals where name != 'INFORMATION_SCHEMA' and name != 'dbo' and name != 'guest'	and name != 'sys' and type = 's'
+	while @sch is not null
+	begin
+		set @str = 'ALTER USER '+quotename( @sch ) + ' WITH DEFAULT_SCHEMA=[dbo]'
+		print 'Alterado Schema: ' + @sch 
+		exec sp_executesql @str
+		print @str
+	select @sch = min( name ) from sys.database_principals where name != 'INFORMATION_SCHEMA' and name != 'dbo' and name != 'guest'	and name != 'sys' and name > @sch and type = 's'
+	end
+
+print '7. Apagando os Schemas: ' + db_name()
+	select @sch = min( name ) from sys.schemas where schema_id > 4
+
+	while @sch is not null
+	begin
+		set @str = 'DROP SCHEMA '+ quotename( @sch ) 
+		print 'Apagado Schema: ' + quotename( @sch ) 
+		exec sp_executesql @str
+		--print @str
+		select @sch = min( name ) from sys.schemas where schema_id > 4 and name > @sch
+	end
+
+print ''
+*/
+print '8. Desabilitando o POLICY do login'
+	select @lgn = min( name ) from master.sys.sql_logins where principal_id > 258 and name != 'CONTROM'
+	while @lgn is not null
+	begin
+		if @lgn != 's6adm01'
+		begin
+		set @str = 'ALTER LOGIN ['+@lgn+'] WITH CHECK_POLICY=OFF'
+		print 'Alterando o Login: ' + @lgn
+		exec sp_executesql @str
+		--print @str
+		end
+		select @lgn = min( name ) from master.sys.sql_logins where principal_id > 258 and name != 'CONTROM'
+			and name > @lgn
+	
+	end
+
+print ''
+print '9. Remove os indices estatisticos...'
+	Declare C_STATISTICS CURSOR for
+	select '['+schema_name(schema_id)+'].['+Object_Name(a.object_id)+'].['+b.name +']'
+	from sys.indexes a Join sys.stats b 
+		On a.object_id = b.object_id
+	Join sys.objects c
+		On  a.object_id = c.object_id 
+	where b.user_created = 0 
+		and b.auto_created  = 1
+		and a.object_id > 99
+		
+	Open C_STATISTICS
+	Fetch  C_STATISTICS Into @name
+	While @@Fetch_Status = 0
+	Begin
+		Set @str = 'Drop statistics '+ @name 
+		Print char(9)+@name
+		exec (@str)
+		Fetch  C_STATISTICS Into @name
+	End
+	Close C_STATISTICS
+	Deallocate C_STATISTICS
+
+print ''
+
+print '10. Reindex do banco : ' + db_name()
+
+	DECLARE C_REINDEX CURSOR for
+		Select TABLE_SCHEMA, TABLE_NAME from INFORMATION_SCHEMA.TABLES where TABLE_TYPE = 'BASE TABLE'
+	OPEN C_REINDEX
+	FETCH C_REINDEX into @owner, @tab
+	While @@FETCH_STATUS = 0
+	Begin
+		Checkpoint
+		set @str = 'dbcc dbreindex( ''' + @owner + '.' + @tab + ''', '''', 0 )'
+		print 'Reindexando tabela: ' + @owner + '.' + @tab
+		exec sp_executesql @str
+		FETCH C_REINDEX into @owner, @tab
+	End
+	Close C_REINDEX
+	Deallocate C_REINDEX
+
+print ''
+print '11. Update Statistics e Marca para Recompilar'
+	exec DBS600..sp_S6UpdStat @banco, 'Migração'
+
+Print ''
+Print '12. DBCC UpdateUsage'
+	DBCC UpdateUSAGE(0)
+
+print ''
+print '13. DBCC CheckDB'
+	exec DBS600..sp_S6Dbcc @banco, 'Migração'
+go

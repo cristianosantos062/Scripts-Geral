@@ -1,0 +1,63 @@
+-----------------------------------------------------------------------------------
+-- SQL 2005/2008
+-----------------------------------------------------------------------------------
+USE MASTER
+GO
+
+CREATE TABLE #TMP_Indices
+(
+	dbs_name	varchar(50),
+	obj_name	sysname,
+	idx_name	sysname,
+	idx_id		int
+)
+
+INSERT INTO #TMP_Indices
+EXEC sp_msforeachdb '
+USE [?];
+SELECT
+	db_name(),
+	object_name([object_id]), 
+	name, 
+	index_id
+FROM sys.indexes
+WHERE is_hypothetical = 1;'
+
+SELECT * FROM #TMP_Indices
+
+DROP TABLE #TMP_Indices
+-----------------------------------------------------------------------------------
+
+
+
+
+-----------------------------------------------------------------------------------
+-- SQL 2000
+-----------------------------------------------------------------------------------
+USE MASTER
+GO
+
+CREATE TABLE #TMP_Indices
+(
+	dbs_name	varchar(50),
+	obj_name	sysname,
+	idx_name	sysname,
+	idx_id		int
+)
+
+INSERT INTO #TMP_Indices
+EXEC sp_msforeachdb '
+USE [?];
+SELECT
+	db_name(),
+	object_name([id]), 
+	name, 
+	indid
+FROM sysindexes
+WHERE status & 0x20<>0
+AND name LIKE ''_dta_%'';'
+
+SELECT * FROM #TMP_Indices
+
+DROP TABLE #TMP_Indices
+-----------------------------------------------------------------------------------

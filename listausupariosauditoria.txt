@@ -1,0 +1,83 @@
+use DBOL500
+go
+
+select
+	@@SERVERNAME Server_Name
+	,db_name() Database_Name
+    ,l.name Login_Name
+	,u.name [User_Name]
+    ,case when (r.principal_id is null) then 'public'
+		else r.name
+	end 
+	as Database_Role_Member
+	,case when (l.is_disabled = 0)
+		then 'no'
+		else 'yes'
+	end
+	as Login_is_disabled
+
+	from sys.database_principals u
+		left join (sys.database_role_members m join sys.database_principals r on m.role_principal_id = r.principal_id) 
+			on m.member_principal_id = u.principal_id
+		left join sys.server_principals l 
+			on u.sid = l.sid
+
+Where l.name is not null
+	and l.name not in ('DM010CTO\plucena', 'dm010cto\omzalal', 'itau\plucena', 'dm010cto\omzalal', 'dm010cto\amedsil', 'dm010cto\natasro', 'itau\natasro', 'irobert')
+				order by 3 asc
+
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+CREATE TABLE #tb1_uga
+   (
+    DatabaseID		sysname        collate database_default Null
+   ,LoginName			sysname        collate database_default Null
+   ,UserName			sysname        collate database_default Null
+   ,DatabaseRoleMeber	sysname        collate database_default Null
+   ,Login_is_desabled	sysname        collate database_default Null
+   )
+
+exec sp_msforeachdb
+		'insert into #tb1_uga
+				(
+				DatabaseID
+				,LoginName
+				,UserName
+				,DatabaseRoleMeber
+				,Login_is_desabled
+				)
+		
+			 select
+				  db_id(''?'')
+                  ,l.name 
+				  ,u.name 
+                  ,case when (r.principal_id is null) then ''public''
+					  else r.name
+				   end
+				  ,l.is_disabled
+
+			 from sys.database_principals u
+			 left join (sys.database_role_members m join sys.database_principals r on m.role_principal_id = r.principal_id) 
+					on m.member_principal_id = u.principal_id
+			 left join sys.server_principals l 
+					on u.sid = l.sid'
+
+	select 
+		db_name(databaseID) DatabaseName,
+		LoginName,
+		DatabaseRoleMeber,
+		Login_is_desabled
+	from  #tb1_uga
+		where LoginName is not null
+		and LoginName not like '#%'
+		--and db_name(databaseID) ='DBHT00'
+
+		order by 2 asc
+
+-- truncate table #tb1_uga
+-- drop table #tb1_uga

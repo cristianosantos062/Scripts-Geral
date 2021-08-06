@@ -1,0 +1,29 @@
+Create PROCEDURE  sp_S6StatusCluster 
+@servidor	varchar(15)=''
+as
+
+--Se não for especificado o nome do servidor, a procedure carrega o servidor ativo da conexão.
+If CharIndex('\',@@servername) = 0 and @servidor=''
+	Set @Servidor =  @@ServerName	
+Else
+	Set @servidor=SubString(@@ServerName,1,CharIndex('\',@@servername)-1)
+
+Declare @Str varchar(255)
+--Mostra Status dos Grupos do cluster
+SELECT @Str = 'master..xp_cmdshell ''%systemroot%\system32\cluster.exe /CLUSTER:' +@servidor + ' GROUP'''
+EXEC (@Str)
+--Mostra Status dos Recursos do Cluster
+SELECT @Str = 'master..xp_cmdshell ''%systemroot%\system32\cluster.exe /CLUSTER:' +@servidor + ' RESOURCE'''
+EXEC (@Str)
+--Mostra Status dos Nós do Cluster
+SELECT @Str = 'master..xp_cmdshell ''%systemroot%\system32\cluster.exe /CLUSTER:' +@servidor + ' NODE'''
+EXEC (@Str)
+--Mostra Status das Interfaces de Rede do Cluster
+SELECT @Str = 'master..xp_cmdshell ''%systemroot%\system32\cluster.exe /CLUSTER:' +@servidor + ' NETINT'''
+EXEC (@Str)
+--Mostra Status das Placas do Cluster
+SELECT @Str = 'master..xp_cmdshell ''%systemroot%\system32\cluster.exe /CLUSTER:' +@servidor + ' NET'''
+EXEC (@Str)
+--master..xp_cmdshell 'c:\WINNT\system32\cluster.exe /?'
+
+

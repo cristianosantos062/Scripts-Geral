@@ -1,0 +1,16 @@
+--Get the current trace rollover file
+select * from ::fn_trace_getinfo(default);
+
+exec sp_trace_setstatus 2, 0; --stop
+exec sp_trace_setstatus 2, 2; --close
+
+-- In archive
+SELECT top 10 textdata, 'tempo' = (cast(datediff(second, starttime, endtime) as varchar) + ' seconds'), databaseid, ntusername, hostname, applicationname, duration, starttime, endtime, reads, writes, cpu, objectid, servername, objecttype, objectname, databasename, rowcounts
+FROM ::fn_trace_gettable('X:\BACKUP01B\Monitora_SADMIN1_S2940962.trc',0)    
+       INNER JOIN sys.trace_events e          
+             ON eventclass = trace_event_id     
+       INNER JOIN sys.trace_categories AS cat          
+             ON e.category_id = cat.category_id
+where trace_event_id <> 20
+       --and TextData is not null
+order by starttime;

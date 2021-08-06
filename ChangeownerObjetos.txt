@@ -1,0 +1,1 @@
+select 'exec sp_changeobjectowner ''' + U.name + '.' + O.name +''', ''dbo''' from sysobjects O, sysusers U where O.uid not in (1,4) and O.type in ('P','V','U') and O.uid=U.uid

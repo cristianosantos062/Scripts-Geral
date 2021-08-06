@@ -1,0 +1,1 @@
+dbcc flushprocindb(113) -- APAGAR O CACHE SO DA BASE.

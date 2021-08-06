@@ -1,0 +1,12 @@
+use BANCO
+
+select o.name, f.groupname, i.rows , i.dpages *8 /1024 as size_kb from sysindexes i
+ join sysfilegroups f
+   on i.groupid = f.groupid
+ join sysobjects o
+   on i.id = o.id
+
+where o.xtype = 'u'
+ and i.indid < 2
+
+order by dpages * 8 /1024 desc

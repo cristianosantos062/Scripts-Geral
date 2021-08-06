@@ -1,0 +1,15 @@
+
+	select
+		upper(database_name) as database_name, avg(perc_used) as avg_datafiles
+	from
+		SQL_ADM.dbo.dbat_monitora_database_files
+	where
+		database_name not in ('TEMPDB','SQL_ADM')
+	and
+		usage='data_only'
+	and
+		file_size_in_mb < 100000
+	group by
+		database_name
+	having
+		avg(perc_used) > 90.0;

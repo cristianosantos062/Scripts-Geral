@@ -1,0 +1,1 @@
+select 'DBCC DBREINDEX (' +a.name+ ', ' +b.name+ ', ' + CAST(b.origfillfactor AS VARCHAR (2))+ ')' + CHAR(13) + 'GO' from sysobjects as a join sysindexes as b on a.id = b.id where a.type = 'u' and b.name not like '_WA%' and a.name not like 'dtproperties%' AND B.INDID <> 0 order by a.name

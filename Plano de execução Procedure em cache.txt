@@ -1,0 +1,11 @@
+Set Nocount on
+
+Declare @T varbinary(100)
+
+select @t = plan_handle from sys.dm_exec_procedure_stats
+
+where  object_name (object_id,database_id)='NOME_DA_PROCEDURE'
+
+select  query_plan from sys.dm_exec_query_plan (@t)
+
+go

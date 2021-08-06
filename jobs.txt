@@ -1,0 +1,10 @@
+use msdb
+go
+select sysjobs.name, sysjobs.[description], sysjobsteps.database_name, sysjobsteps.step_name, sysjobsteps.command
+from sysjobs 
+  join sysjobsteps
+  on sysjobs.job_id = sysjobsteps.job_id 
+  
+  where database_name not in (select name from master..sysdatabases)
+  
+  order by 1 asc

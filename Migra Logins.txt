@@ -1,0 +1,160 @@
+-- Logins do(s) Banco(s): DBC704, 
+ 
+-- Script para Migrar usuarios V1.0
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-- 1 Cria Logins ******************
+If Not Exists (select Name from sys.server_principals Where Name = 'adminc7')
+	CREATE LOGIN [adminc7] With Password = 0x01009a5c5133f0184b2c9088950617561e747ca1a547edccc18ef0184b2c9088950617561e747ca1a547edccc18e HASHED, CHECK_POLICY = OFF, CHECK_EXPIRATION = OFF 
+If Not Exists (select Name from sys.server_principals Where Name = 'CONTROM')
+	CREATE LOGIN [CONTROM] With Password = 0x01006913d814cdfefe98763a854c5a10f6bdc50f63fb1bb2b1e650c3fde988aae8ae419c15b091c55efcbb0ecf45 HASHED, CHECK_POLICY = OFF, CHECK_EXPIRATION = OFF 
+If Not Exists (select Name from sys.server_principals Where Name = 'DM010CTO\ADMIN_TIVOLI')
+	CREATE LOGIN [DM010CTO\ADMIN_TIVOLI] FROM WINDOWS
+If Not Exists (select Name from sys.server_principals Where Name = 'DM010CTO\SRVSQLS')
+	CREATE LOGIN [DM010CTO\SRVSQLS] FROM WINDOWS
+If Not Exists (select Name from sys.server_principals Where Name = 'NETOALO')
+	CREATE LOGIN [NETOALO] With Password = 0x0100d4326f2e8cd18cf5dd34a4f03bb4368d4755b44aa5b3bc408cd18cf5dd34a4f03bb4368d4755b44aa5b3bc40 HASHED, CHECK_POLICY = OFF, CHECK_EXPIRATION = OFF 
+If Not Exists (select Name from sys.server_principals Where Name = 'TIVOIDI')
+	CREATE LOGIN [TIVOIDI] With Password = 0x01004d353a7b6fafe538c30ed41122a7d1c074ce7efaa3f1cca276e37c47e9fe20edccd5c960fc2fe856441c24cc HASHED, CHECK_POLICY = OFF, CHECK_EXPIRATION = OFF 
+
+-- 2) Cria Roles e Cria os usuários *********************************
+use DBC704
+go
+If Not Exists (select Name from sys.database_principals where type = 'R' and Name = 'GC700')
+	CREATE ROLE GC700
+If Not Exists (select Name from sys.database_principals where type = 'R' and Name = 'GC750')
+	CREATE ROLE GC750
+
+If Not Exists (select Name from sys.database_principals where type <> 'R' and Name = 'ADMIN_TIVOLI')
+	CREATE USER [ADMIN_TIVOLI] FOR LOGIN [DM010CTO\ADMIN_TIVOLI] WITH DEFAULT_SCHEMA = [DBO]
+If Not Exists (select Name from sys.database_principals where type <> 'R' and Name = 'adminc7')
+	CREATE USER [adminc7] FOR LOGIN [adminc7] WITH DEFAULT_SCHEMA = [DBO]
+If Not Exists (select Name from sys.database_principals where type <> 'R' and Name = 'CONTROM')
+	CREATE USER [CONTROM] FOR LOGIN [CONTROM] WITH DEFAULT_SCHEMA = [DBO]
+If Not Exists (select Name from sys.database_principals where type <> 'R' and Name = 'DM010CTO\SRVSQLS')
+	CREATE USER [DM010CTO\SRVSQLS] FOR LOGIN [DM010CTO\SRVSQLS] WITH DEFAULT_SCHEMA = [DBO]
+If Not Exists (select Name from sys.database_principals where type <> 'R' and Name = 'NETOALO')
+	CREATE USER [NETOALO] FOR LOGIN [NETOALO] WITH DEFAULT_SCHEMA = [DBO]
+If Not Exists (select Name from sys.database_principals where type <> 'R' and Name = 'TIVOIDI')
+	CREATE USER [TIVOIDI] FOR LOGIN [TIVOIDI] WITH DEFAULT_SCHEMA = [DBO]
+exec sp_addrolemember [db_accessadmin],[ADMIN_TIVOLI]
+go
+exec sp_addrolemember [db_accessadmin],[TIVOIDI]
+go
+exec sp_addrolemember [db_owner],[CONTROM]
+go
+exec sp_addrolemember [db_owner],[TIVOIDI]
+go
+exec sp_addrolemember [db_securityadmin],[ADMIN_TIVOLI]
+go
+exec sp_addrolemember [db_securityadmin],[TIVOIDI]
+go
+exec sp_addrolemember [GC700],[adminc7]
+go
+exec sp_addrolemember [GC700],[NETOALO]
+go
+exec sp_addrolemember [GC750],[adminc7]
+go
+exec sp_addrolemember [public],[DM010CTO\SRVSQLS]
+go
+
+-- 3) Gera Defaults *************************
+Use master
+go
+If Exists (Select name from sys.server_principals where name = 'CONTROM' and default_database_name = 'master')
+	exec sp_defaultDB  [CONTROM], master
+If Exists (Select name from sys.server_principals where name = 'DM010CTO\ADMIN_TIVOLI' and default_database_name = 'master')
+	exec sp_defaultDB  [DM010CTO\ADMIN_TIVOLI], master
+If Exists (Select name from sys.server_principals where name = 'DM010CTO\ADMIN_TIVOLI' and default_database_name = 'master')
+	exec sp_defaultDB  [DM010CTO\ADMIN_TIVOLI], master
+If Exists (Select name from sys.server_principals where name = 'DM010CTO\SRVSQLS' and default_database_name = 'master')
+	exec sp_defaultDB  [DM010CTO\SRVSQLS], DBOB741
+If Exists (Select name from sys.server_principals where name = 'NETOALO' and default_database_name = 'master')
+	exec sp_defaultDB  [NETOALO], DBR700
+If Exists (Select name from sys.server_principals where name = 'TIVOIDI' and default_database_name = 'master')
+	exec sp_defaultDB  [TIVOIDI], master
+If Exists (Select name from sys.server_principals where name = 'TIVOIDI' and default_database_name = 'master')
+	exec sp_defaultDB  [TIVOIDI], master
+If Exists (Select name from sys.server_principals where name = 'TIVOIDI' and default_database_name = 'master')
+	exec sp_defaultDB  [TIVOIDI], master
+	
+	
+	
+	-- Logins do(s) Banco(s): DBC703, 
+ 
+-- Script para Migrar usuarios V1.0
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-- 1 Cria Logins ******************
+If Not Exists (select Name from sys.server_principals Where Name = 'adminc7')
+	CREATE LOGIN [adminc7] With Password = 0x01009a5c5133f0184b2c9088950617561e747ca1a547edccc18ef0184b2c9088950617561e747ca1a547edccc18e HASHED, CHECK_POLICY = OFF, CHECK_EXPIRATION = OFF 
+If Not Exists (select Name from sys.server_principals Where Name = 'CONTROM')
+	CREATE LOGIN [CONTROM] With Password = 0x01006913d814cdfefe98763a854c5a10f6bdc50f63fb1bb2b1e650c3fde988aae8ae419c15b091c55efcbb0ecf45 HASHED, CHECK_POLICY = OFF, CHECK_EXPIRATION = OFF 
+If Not Exists (select Name from sys.server_principals Where Name = 'DM010CTO\ADMIN_TIVOLI')
+	CREATE LOGIN [DM010CTO\ADMIN_TIVOLI] FROM WINDOWS
+If Not Exists (select Name from sys.server_principals Where Name = 'DM010CTO\SRVSQLS')
+	CREATE LOGIN [DM010CTO\SRVSQLS] FROM WINDOWS
+If Not Exists (select Name from sys.server_principals Where Name = 'NETOALO')
+	CREATE LOGIN [NETOALO] With Password = 0x0100d4326f2e8cd18cf5dd34a4f03bb4368d4755b44aa5b3bc408cd18cf5dd34a4f03bb4368d4755b44aa5b3bc40 HASHED, CHECK_POLICY = OFF, CHECK_EXPIRATION = OFF 
+If Not Exists (select Name from sys.server_principals Where Name = 'TIVOIDI')
+	CREATE LOGIN [TIVOIDI] With Password = 0x01004d353a7b6fafe538c30ed41122a7d1c074ce7efaa3f1cca276e37c47e9fe20edccd5c960fc2fe856441c24cc HASHED, CHECK_POLICY = OFF, CHECK_EXPIRATION = OFF 
+
+-- 2) Cria Roles e Cria os usuários *********************************
+use DBC703
+go
+If Not Exists (select Name from sys.database_principals where type = 'R' and Name = 'GC700')
+	CREATE ROLE GC700
+If Not Exists (select Name from sys.database_principals where type = 'R' and Name = 'GC750')
+	CREATE ROLE GC750
+
+If Not Exists (select Name from sys.database_principals where type <> 'R' and Name = 'ADMIN_TIVOLI')
+	CREATE USER [ADMIN_TIVOLI] FOR LOGIN [DM010CTO\ADMIN_TIVOLI] WITH DEFAULT_SCHEMA = [DBO]
+If Not Exists (select Name from sys.database_principals where type <> 'R' and Name = 'adminc7')
+	CREATE USER [adminc7] FOR LOGIN [adminc7] WITH DEFAULT_SCHEMA = [DBO]
+If Not Exists (select Name from sys.database_principals where type <> 'R' and Name = 'CONTROM')
+	CREATE USER [CONTROM] FOR LOGIN [CONTROM] WITH DEFAULT_SCHEMA = [DBO]
+If Not Exists (select Name from sys.database_principals where type <> 'R' and Name = 'DM010CTO\SRVSQLS')
+	CREATE USER [DM010CTO\SRVSQLS] FOR LOGIN [DM010CTO\SRVSQLS] WITH DEFAULT_SCHEMA = [DBO]
+If Not Exists (select Name from sys.database_principals where type <> 'R' and Name = 'NETOALO')
+	CREATE USER [NETOALO] FOR LOGIN [NETOALO] WITH DEFAULT_SCHEMA = [DBO]
+If Not Exists (select Name from sys.database_principals where type <> 'R' and Name = 'TIVOIDI')
+	CREATE USER [TIVOIDI] FOR LOGIN [TIVOIDI] WITH DEFAULT_SCHEMA = [DBO]
+exec sp_addrolemember [db_accessadmin],[ADMIN_TIVOLI]
+go
+exec sp_addrolemember [db_accessadmin],[TIVOIDI]
+go
+exec sp_addrolemember [db_owner],[CONTROM]
+go
+exec sp_addrolemember [db_owner],[TIVOIDI]
+go
+exec sp_addrolemember [db_securityadmin],[ADMIN_TIVOLI]
+go
+exec sp_addrolemember [db_securityadmin],[TIVOIDI]
+go
+exec sp_addrolemember [GC700],[adminc7]
+go
+exec sp_addrolemember [GC700],[NETOALO]
+go
+exec sp_addrolemember [GC750],[adminc7]
+go
+exec sp_addrolemember [public],[DM010CTO\SRVSQLS]
+go
+
+-- 3) Gera Defaults *************************
+Use master
+go
+If Exists (Select name from sys.server_principals where name = 'CONTROM' and default_database_name = 'master')
+	exec sp_defaultDB  [CONTROM], master
+If Exists (Select name from sys.server_principals where name = 'DM010CTO\ADMIN_TIVOLI' and default_database_name = 'master')
+	exec sp_defaultDB  [DM010CTO\ADMIN_TIVOLI], master
+If Exists (Select name from sys.server_principals where name = 'DM010CTO\ADMIN_TIVOLI' and default_database_name = 'master')
+	exec sp_defaultDB  [DM010CTO\ADMIN_TIVOLI], master
+If Exists (Select name from sys.server_principals where name = 'DM010CTO\SRVSQLS' and default_database_name = 'master')
+	exec sp_defaultDB  [DM010CTO\SRVSQLS], DBOB741
+If Exists (Select name from sys.server_principals where name = 'NETOALO' and default_database_name = 'master')
+	exec sp_defaultDB  [NETOALO], DBR700
+If Exists (Select name from sys.server_principals where name = 'TIVOIDI' and default_database_name = 'master')
+	exec sp_defaultDB  [TIVOIDI], master
+If Exists (Select name from sys.server_principals where name = 'TIVOIDI' and default_database_name = 'master')
+	exec sp_defaultDB  [TIVOIDI], master
+If Exists (Select name from sys.server_principals where name = 'TIVOIDI' and default_database_name = 'master')
+	exec sp_defaultDB  [TIVOIDI], master
+

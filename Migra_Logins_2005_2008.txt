@@ -1,0 +1,274 @@
+USE [DBS600]
+GO
+
+/****** Object:  StoredProcedure [dbo].[spS6MigraLoginsBaseTeste]    Script Date: 07/26/2010 14:44:35 ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE PROCEDURE [dbo].[spS6MigraLoginsBaseTeste]
+	@banco01 [varchar](50) = '',
+	@banco02 [varchar](50) = '',
+	@banco03 [varchar](50) = '',
+	@banco04 [varchar](50) = '',
+	@banco05 [varchar](50) = ''
+WITH EXECUTE AS CALLER
+AS
+If Not Exists (Select name from master.dbo.sysobjects where name = 'sp_hexadecimal' )
+Begin
+	Print 'Erro -- Não Existe a procedure master.dbo.sp_hexadecimal neste servidor... '
+	Print 'Favor compilar esta proc no master... e após reexecutar esta proc'
+	Return (1)
+End
+
+Set NoCount On
+Declare @Bancos VarChar(500)
+Declare @C_Banco Varchar(100)
+Declare @T_SQL VarChar(5000)
+
+
+
+DECLARE @defaultdb sysname
+ 
+-- Centraliza bancos de dados
+Set @Bancos = ''''+@banco01+''''+','''+@banco02+''''+','''+@banco03+''''+','''+@banco04+''''+','''+@banco05+''','
+Set @Bancos = @Bancos + ''''''
+--Select @Bancos
+ 
+--Tabelas auxiliares
+Create Table #AuxLogins (id int identity, LinhaCMD VarChar(500))
+
+Create Table #TBbancos (
+	Banco VarChar(100)	
+)
+Create Table ##TBBancosUsuariosRoles (
+	Banco 	VarChar(100),
+	Login 	sysname,
+	UserName	VarChar(100),
+	Role 		VarChar(30),
+	DefaultDB	VarChar(100)
+)
+
+-- Carrega bancos em tabela auxiliar.
+Set @T_SQL = 'Select Name from master..sysdatabases where name in ('+@Bancos+')'
+Insert Into #TBbancos exec (@T_SQL)
+
+Declare @TBancos Varchar(500)
+Set @TBancos = ''
+-- Cursor para coletar todos os Logins, users e banco Default
+Declare C_Bancos CURSOR for 
+	Select Banco from #TBbancos
+Open C_Bancos
+Fetch C_Bancos Into @C_Banco
+While @@Fetch_Status = 0
+Begin
+	Set @TBancos = @TBancos + @C_Banco + ', '
+	Set @T_SQL = 'SELECT	'''+@C_Banco+''',lo.loginname as Login	,usu.name as UserName	,case		when (usg.uid is null) then ''public''		else usg.name 	end as Role	,lo.dbname as DefaultDB '
+	Set @T_SQL = @T_SQL + ' from '+@C_Banco+'..sysusers	usu left outer join	('+@C_Banco+'..sysmembers mem inner join '+@C_Banco+'..sysusers usg on mem.groupuid = usg.uid) '
+	Set @T_SQL = @T_SQL + ' 		on usu.uid = mem.memberuid '
+	Set @T_SQL = @T_SQL + ' 	left outer join master.dbo.syslogins lo '
+	Set @T_SQL = @T_SQL + ' 		on usu.sid = lo.sid '
+	Set @T_SQL = @T_SQL + ' where	(usu.islogin = 1 and usu.isaliased = 0 and usu.hasdbaccess = 1) and'
+	Set @T_SQL = @T_SQL + ' 	(usg.issqlrole = 1 or usg.uid is null) and '
+	Set @T_SQL = @T_SQL + ' 	(lo.loginname <> ''sa'' )'
+	Insert Into ##TBBancosUsuariosRoles exec (@T_SQL)
+	Fetch C_Bancos Into @C_Banco
+End
+
+Close C_Bancos
+Deallocate C_Bancos
+Print '-- Logins do(s) Banco(s): '+ @TBancos
+Print ''
+
+
+-- 1 Gera Script de Logins
+
+DECLARE @name sysname
+DECLARE @type varchar (1)
+DECLARE @hasaccess int
+DECLARE @denylogin int
+DECLARE @is_disabled int
+DECLARE @PWD_varbinary  varbinary (256)
+DECLARE @PWD_string  varchar (514)
+DECLARE @SID_varbinary varbinary (85)
+DECLARE @SID_string varchar (514)
+DECLARE @tmpstr  varchar (1024)
+DECLARE @is_policy_checked varchar (3)
+DECLARE @is_expiration_checked varchar (3)
+DECLARE @login_name varchar (10)
+
+
+IF (@login_name IS NULL)
+
+  DECLARE login_curs CURSOR FOR
+
+      SELECT p.sid, p.name, p.type, p.is_disabled, p.default_database_name, l.hasaccess, l.denylogin FROM 
+sys.server_principals p LEFT JOIN sys.syslogins l
+      ON ( l.name = p.name ) WHERE p.type IN ( 'S', 'G', 'U' ) AND p.name <> 'sa'
+ELSE
+  DECLARE login_curs CURSOR FOR
+
+
+      SELECT p.sid, p.name, p.type, p.is_disabled, p.default_database_name, l.hasaccess, l.denylogin FROM 
+sys.server_principals p LEFT JOIN sys.syslogins l
+      ON ( l.name = p.name ) WHERE p.type IN ( 'S', 'G', 'U' ) AND p.name = @login_name
+OPEN login_curs
+
+FETCH NEXT FROM login_curs INTO @SID_varbinary, @name, @type, @is_disabled, @defaultdb, @hasaccess, @denylogin
+IF (@@fetch_status = -1)
+BEGIN
+  PRINT 'No login(s) found.'
+  CLOSE login_curs
+  DEALLOCATE login_curs
+  RETURN -1
+END
+SET @tmpstr = '/* spS6MigraLoginsBaseTeste script '
+PRINT @tmpstr
+SET @tmpstr = '** Generated ' + CONVERT (varchar, GETDATE()) + ' on ' + @@SERVERNAME + ' */'
+PRINT @tmpstr
+PRINT ''
+WHILE (@@fetch_status <> -1)
+BEGIN
+  IF (@@fetch_status <> -2)
+  BEGIN
+    PRINT ''
+    SET @tmpstr = '-- Login: ' + @name
+    PRINT @tmpstr
+    IF (@type IN ( 'G', 'U'))
+    BEGIN -- NT authenticated account/group
+
+      SET @tmpstr = 'CREATE LOGIN ' + QUOTENAME( @name ) + ' FROM WINDOWS WITH DEFAULT_DATABASE = [' + @defaultdb + ']'
+    END
+    ELSE BEGIN -- SQL Server authentication
+        -- obtain password and sid
+            SET @PWD_varbinary = CAST( LOGINPROPERTY( @name, 'PasswordHash' ) AS varbinary (256) )
+        EXEC sp_hexadecimal @PWD_varbinary, @PWD_string OUT
+        EXEC sp_hexadecimal @SID_varbinary,@SID_string OUT
+ 
+        -- obtain password policy state
+        SELECT @is_policy_checked = CASE is_policy_checked WHEN 1 THEN 'ON' WHEN 0 THEN 'OFF' ELSE NULL END FROM sys.sql_logins WHERE name = @name
+        SELECT @is_expiration_checked = CASE is_expiration_checked WHEN 1 THEN 'ON' WHEN 0 THEN 'OFF' ELSE NULL END FROM sys.sql_logins WHERE name = @name
+ 
+            SET @tmpstr = 'CREATE LOGIN ' + QUOTENAME( @name ) + ' WITH PASSWORD = ' + @PWD_string + ' HASHED, SID = ' + @SID_string + ', DEFAULT_DATABASE = [' + @defaultdb + ']'
+
+        IF ( @is_policy_checked IS NOT NULL )
+        BEGIN
+          SET @tmpstr = @tmpstr + ', CHECK_POLICY = ' + @is_policy_checked
+        END
+        IF ( @is_expiration_checked IS NOT NULL )
+        BEGIN
+          SET @tmpstr = @tmpstr + ', CHECK_EXPIRATION = ' + @is_expiration_checked
+        END
+    END
+    IF (@denylogin = 1)
+    BEGIN -- login is denied access
+      SET @tmpstr = @tmpstr + '; DENY CONNECT SQL TO ' + QUOTENAME( @name )
+    END
+    ELSE IF (@hasaccess = 0)
+    BEGIN -- login exists but does not have access
+      SET @tmpstr = @tmpstr + '; REVOKE CONNECT SQL TO ' + QUOTENAME( @name )
+    END
+    IF (@is_disabled = 1)
+    BEGIN -- login is disabled
+      SET @tmpstr = @tmpstr + '; ALTER LOGIN ' + QUOTENAME( @name ) + ' DISABLE'
+    END
+    PRINT @tmpstr
+  END
+
+  FETCH NEXT FROM login_curs INTO @SID_varbinary, @name, @type, @is_disabled, @defaultdb, @hasaccess, @denylogin
+   END
+CLOSE login_curs
+DEALLOCATE login_curs
+--RETURN 0
+
+--2) Cria Roles ********************************************************
+declare @nomebanco 	varchar(30)
+declare @str 		varchar(500)
+declare @grupo		varchar(50)
+declare @usuario	varchar(100)
+	
+	insert #AuxLogins (LinhaCmd) values ('')  
+	insert #AuxLogins (LinhaCmd) values ('-- 2) Cria Roles e Cria os usuários *********************************')  
+	create table #tbAux( ColAux varchar(255) null )
+   select  @nomebanco = min( Banco ) from #TBbancos
+   while @nomebanco is not null
+   begin
+	if DATABASEPROPERTY( @nomebanco, 'IsInLoad') = 0 AND DATABASEPROPERTY( @nomebanco, 'IsOffLine') = 0
+	begin
+     	  --> Insere o nome do banco
+	       select @str = 'use ' + @nomebanco
+	       insert #AuxLogins( LinhaCmd ) values ( @str )  
+	       insert #AuxLogins( LinhaCmd ) values ( 'go' ) 
+        
+	       --> Seleciona os grupos 
+	       delete #tbAux
+	       set @str = 'insert into #tbAux( ColAux ) ' 
+	       set @str = @str + 'select Role from ##TBBancosUsuariosRoles  where Banco = ''' + @nomebanco +''' and Role Not In (''db_accessadmin'',''public'',''db_owner'',''db_securityadmin'')'
+	       exec( @str ) 
+     
+	       select  @grupo = min( ColAux ) from #tbAux
+	       while @grupo is not null        
+        	   begin 
+	           --> Insere comando para inclusao dos grupos 
+			
+        	   insert #AuxLogins( LinhaCmd ) values ( 'If Not Exists (select Name from sys.database_principals where type = ''R'' and Name = '''+@grupo +''')') 
+        	   insert #AuxLogins( LinhaCmd ) values ( '	CREATE ROLE '+@grupo ) 
+        	   select  @grupo = min( ColAux ) from #tbAux where ColAux > @grupo       
+	        end 
+
+
+	       --> Inclui usuario no banco 
+     	   insert #AuxLogins( LinhaCmd ) values ( '') 
+
+	       delete #tbAux
+	       set @str = 'select UserName from ##TBBancosUsuariosRoles  where Banco = ''' + @nomebanco +''''
+	       insert into #tbAux( ColAux ) exec( @str ) 
+     
+	     	  select  @usuario = min( ColAux ) from #tbAux
+	       while @usuario is not null        
+        	   begin 
+	           --> Insere comando para conceder permissao de acesso no banco
+				Declare @Login_ VarChar(100)	
+				Select @Login_ = Login from ##TBBancosUsuariosRoles where UserName = @usuario
+        	   insert #AuxLogins( LinhaCmd ) values ( 'If Not Exists (select Name from sys.database_principals where type <> ''R'' and Name = '''+@USUARIO +''')') 
+        	   insert #AuxLogins( LinhaCmd ) values ( '	CREATE USER ['+@USUARIO+'] FOR LOGIN ['+@LOGIN_+'] WITH DEFAULT_SCHEMA = [DBO]' ) 
+       	   select  @usuario = min( ColAux ) from #tbAux where ColAux > @usuario       
+	        end 
+
+
+        	--> Seleciona/Inclui linha de comando dos usuarios  
+	        delete #tbAux
+
+			set @str = 'select ''[''+role+''],''+''[''+Username+'']'' from ##TBBancosUsuariosRoles where banco = ''' + @nomebanco +''''
+        	insert into #tbAux( ColAux ) exec( @str ) 
+
+	        select  @usuario = min( ColAux ) from #tbAux
+        	while @usuario is not null        
+	           begin 
+        	   --> Insere linha de comando para inclusao de usuarios
+	           insert #AuxLogins( LinhaCmd ) values (  'exec sp_addrolemember '+@usuario ) 
+        	   insert #AuxLogins( LinhaCmd ) values (  'go' ) 
+	           select  @usuario = min( ColAux ) from #tbAux where ColAux > @usuario       
+        	end 
+	end
+	   select  @nomebanco = min( Banco ) from #TBbancos  where  Banco > @nomebanco
+  	end
+
+--3) Gera Defaults
+insert #AuxLogins (LinhaCmd) values ('') 
+Insert Into #AuxLogins Values ('-- 3) Gera Defaults *************************')
+Insert Into #AuxLogins Values ('Use master')
+Insert Into #AuxLogins Values ('go')
+Set @str = 'select ''If Exists (Select name from sys.server_principals where name = '''''' + b.Login + '''''' and default_database_name = ''''master'''')
+	exec sp_defaultDB  [''+ b.Login + ''], ''+ b.DefaultDB '' ''
+from ##TBBancosUsuariosRoles b '
+Insert Into #AuxLogins exec (@str)
+
+Select LinhaCMD as [-- Script para Migrar usuarios V1.0] from #AuxLogins where LinhaCMD is not null order by Id 
+
+Drop table ##TBBancosUsuariosRoles
+GO
+
+

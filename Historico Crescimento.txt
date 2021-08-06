@@ -1,0 +1,16 @@
+use DBS600
+go
+Declare @Data_Max datetime
+Declare @Banco Varchar(100)
+Set @Banco = 'DBCR01'
+Select @Data_Max = Max(Data_Coleta) from tbs6inv where banco = @Banco 
+select a.servidor, a.banco, a.dados, a.log, a.ocupado, a.livre, a.data_coleta 
+from tbs6inv a
+where banco = @Banco 
+	and data_coleta  = (Select Min(b.Data_Coleta) from tbs6inv b where convert(varchar(7), b.Data_Coleta, 120) = convert(varchar(7), a.Data_Coleta, 120))
+Union 
+select a.servidor, a.banco, a.dados, a.log, a.ocupado, a.livre, a.data_coleta 
+from tbs6inv a
+where banco = @Banco 
+	and data_coleta = @Data_Max
+Order by data_Coleta

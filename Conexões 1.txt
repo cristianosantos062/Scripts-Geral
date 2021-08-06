@@ -1,0 +1,7 @@
+go
+sp_who3 
+go
+declare @dbid as int
+select @dbid=db_id('dboo301')
+select db_name(dbid) as Banco, *   from  master..sysprocesses
+where dbid=@dbid and kpid>0

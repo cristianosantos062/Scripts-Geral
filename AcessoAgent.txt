@@ -1,0 +1,8 @@
+use master
+	grant execute on xp_sqlagent_enum_jobs to [funcional\ttosta]
+	grant execute on xp_sqlagent_is_starting  to [funcional\ttosta]
+
+USE [msdb]
+GO
+EXEC sp_addrolemember N'SQLAgentReaderRole', N'FUNCIONAL\ttosta'
+GO

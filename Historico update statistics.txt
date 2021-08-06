@@ -1,0 +1,7 @@
+Select Cast(DB_NAME() as Char(20)) as Banco, 
+Cast(Object_name(id) as Char(45)) as TableName,
+Cast(Name as Char(45)) as IndexSTATISTICSName, 
+stats_date(id, indid) as Lastupdate
+from sysindexes 
+Where indid > 0
+Order By TableName, LastUpdate

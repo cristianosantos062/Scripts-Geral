@@ -1,0 +1,3 @@
+dbcc tracestatus (-1)
+
+dbcc traceon (1204,3605,-1)

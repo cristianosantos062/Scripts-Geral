@@ -1,0 +1,30 @@
+use DBS601
+go
+select
+	sv.ServidorFisico,
+	gb.Instancia, 
+	gb.Dados_Reservado_GB,
+	gb.Banco,
+	gb.Sigla,
+	gb.Diretoria,
+	sv.Descricao
+from TBS6GestaoBancos gb
+
+	join TBS6SERV sv
+		on gb.Instancia = sv.Servidor
+
+WHERE gb.Diretoria = 'DSMCS'
+  AND gb.Instancia = 'SQDSC007\D'
+
+
+SELECT * FROM TBS6GestaoBancos where Sigla = 'LZ'
+select * from DBS601..tbs6siglas where Sigla = 'F0'
+select * from TBS6GestaoBancos where Banco = 'DT_ARQUIVE'
+select * from sysobjects where name like ''
+select * from TBS6GestaoBancos_Hist where Sigla = 'f0'
+
+
+select SUM(Dados_Reservado_GB) from TBS6GestaoBancos
+WHERE Diretoria = 'DSMCS'
+  AND Instancia = 'SQACC002\A'
+  

@@ -1,0 +1,3 @@
+select cast(target_data as xml) from sys.dm_xe_session_targets 
+
+select SUBSTRING(text,7176/2,(8572-7176)/2) from sys.dm_exec_sql_text(0x03000A0066F29B418E660B01549E00000100000000000000)
